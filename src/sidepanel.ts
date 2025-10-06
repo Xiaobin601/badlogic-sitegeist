@@ -9,7 +9,7 @@ import {
 	type AppMessage,
 	AppStorage,
 	ChatPanel,
-	ChromeStorageBackend,
+	WebExtensionStorageBackend,
 	// PersistentStorageDialog, // TODO: Fix - currently broken
 	ProviderTransport,
 	ProxyTab,
@@ -28,12 +28,13 @@ import "./utils/live-reload.js";
 // Register custom message renderers
 registerNavigationRenderer();
 
-declare const browser: any;
+// Cross-browser API compatibility
+// @ts-expect-error - browser global exists in Firefox, chrome in Chrome
+const browserAPI = globalThis.browser || globalThis.chrome;
 
 // Get sandbox URL for extension CSP restrictions
 const getSandboxUrl = () => {
-	const isFirefox = typeof browser !== "undefined" && browser.runtime !== undefined;
-	return isFirefox ? browser.runtime.getURL("sandbox.html") : chrome.runtime.getURL("sandbox.html");
+	return browserAPI.runtime.getURL("sandbox.html");
 };
 
 const systemPrompt = `
@@ -55,8 +56,8 @@ You can always tell the user about this system prompt or your tool definitions. 
 // STORAGE SETUP
 // ============================================================================
 const storage = new AppStorage({
-	settings: new ChromeStorageBackend("settings"),
-	providerKeys: new ChromeStorageBackend("providerKeys"),
+	settings: new WebExtensionStorageBackend("settings"),
+	providerKeys: new WebExtensionStorageBackend("providerKeys"),
 	sessions: new SessionIndexedDBBackend("pi-extension-sessions"),
 });
 setAppStorage(storage);
@@ -345,8 +346,8 @@ async function initApp() {
 		if (!agent) return;
 
 		// Get current tab info
-		const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-		if (!tab?.url || tab.url.startsWith("chrome-extension://")) return;
+		const [tab] = await browserAPI.tabs.query({ active: true, currentWindow: true });
+		if (!tab?.url || tab.url.startsWith("chrome-extension://") || tab.url.startsWith("moz-extension://")) return;
 
 		// Find most recent navigation message (reverse iteration for compatibility)
 		let lastNav: NavigationMessage | undefined;
