@@ -1,0 +1,98 @@
+# Sitegeist
+
+AI-powered browser extension for web navigation and interaction.
+
+## Development Setup
+
+### Prerequisites
+
+This extension depends on packages from the pi-mono monorepo via `file:` dependencies. You need to have pi-mono cloned in a sibling directory:
+
+```
+workspaces/
+├── pi-mono/
+│   └── packages/
+│       ├── ai/
+│       └── web-ui/
+└── sitegeist/
+```
+
+### Installation
+
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Start pi-mono dev server (in another terminal):
+```bash
+cd ../pi-mono
+npm run dev
+```
+
+This will watch and rebuild `@mariozechner/pi-ai` and `@mariozechner/pi-web-ui` packages.
+
+3. Start sitegeist dev server:
+```bash
+npm run dev
+```
+
+This will:
+- Watch and rebuild the extension for both Chrome and Firefox
+- Watch and rebuild Tailwind CSS
+- Run hot reload server on port 8765
+
+### Building
+
+Build for specific browser:
+```bash
+npm run build:chrome   # Build for Chrome/Edge
+npm run build:firefox  # Build for Firefox
+```
+
+Build for all browsers:
+```bash
+npm run build
+```
+
+### Loading the Extension
+
+**Chrome/Edge:**
+1. Open `chrome://extensions/` or `edge://extensions/`
+2. Enable "Developer mode"
+3. Click "Load unpacked"
+4. Select `sitegeist/dist-chrome/`
+
+**Firefox:**
+1. Open `about:debugging`
+2. Click "This Firefox"
+3. Click "Load Temporary Add-on"
+4. Select any file in `sitegeist/dist-firefox/`
+
+### Hot Reload
+
+When running `npm run dev`, the extension will automatically reload when you make changes to the source files. The WebSocket server on port 8765 coordinates this.
+
+## Architecture
+
+See `README.old.md` for detailed architecture documentation.
+
+Key features:
+- Side panel UI (Chrome/Edge) / Sidebar (Firefox)
+- Real-time navigation tracking
+- Custom message types with renderers
+- Tool execution (browser JavaScript, artifacts)
+- Session management with IndexedDB
+- Cross-browser compatibility
+
+## Dependencies
+
+- `@mariozechner/pi-ai` - AI provider abstractions and agent loop
+- `@mariozechner/pi-web-ui` - Reusable chat UI components
+- Chrome/Firefox extension APIs
+- mini-lit web components
+- Tailwind CSS v4
+
+## License
+
+MIT
