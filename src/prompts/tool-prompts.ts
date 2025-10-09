@@ -172,10 +172,12 @@ Output:
 
 ${ARTIFACTS_RUNTIME_PROVIDER_DESCRIPTION}
 
-- return <value> - To capture and display a return value, use an explicit return statement at the end of your script
-  * Without an explicit return, the script executes but no value is captured
+- return <value> - To capture and display a return value, you MUST use an explicit return statement
+  * REQUIRED: Use return if you want to show a value in the output
+  * Without return, the script executes successfully but no value is displayed (only console logs)
   * Example: return document.title
   * Example: return await Promise.resolve(42)
+  * Note: Just writing an expression like "document.title" or "42" at the end does NOT capture the value - you need return
 
 Examples:
 - Get page title: document.title

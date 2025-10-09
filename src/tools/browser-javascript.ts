@@ -306,9 +306,16 @@ async function wrapperFunction() {
 
 		// Call completion callbacks before returning (success path)
 		// @ts-expect-error
-		if (window.__completionCallbacks) {
-			// @ts-expect-error
-			await Promise.all(window.__completionCallbacks.map(cb => cb(true)));
+		if (window.__completionCallbacks && window.__completionCallbacks.length > 0) {
+			try {
+				await Promise.race([
+					// @ts-expect-error
+					Promise.all(window.__completionCallbacks.map(cb => cb(true))),
+					new Promise((_, reject) => setTimeout(() => reject(new Error('Completion timeout')), 5000))
+				]);
+			} catch (e) {
+				console.error('Completion callback error:', e);
+			}
 		}
 
 		cleanup();
@@ -319,9 +326,16 @@ async function wrapperFunction() {
 	} catch (error: any) {
 		// Call completion callbacks before returning (error path)
 		// @ts-expect-error
-		if (window.__completionCallbacks) {
-			// @ts-expect-error
-			await Promise.all(window.__completionCallbacks.map(cb => cb(false)));
+		if (window.__completionCallbacks && window.__completionCallbacks.length > 0) {
+			try {
+				await Promise.race([
+					// @ts-expect-error
+					Promise.all(window.__completionCallbacks.map(cb => cb(false))),
+					new Promise((_, reject) => setTimeout(() => reject(new Error('Completion timeout')), 5000))
+				]);
+			} catch (e) {
+				console.error('Completion callback error:', e);
+			}
 		}
 
 		cleanup();
