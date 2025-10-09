@@ -589,21 +589,13 @@ export class BrowserJavaScriptTool
 		try {
 			// Check if already aborted
 			if (signal?.aborted) {
-				return {
-					output: "Tool execution was aborted",
-					isError: true,
-					details: { files: [] },
-				};
+				throw new Error("Tool execution was aborted");
 			}
 
 			// Validate navigation commands
 			const validation = validateBrowserJavaScript(args.code);
 			if (!validation.valid) {
-				return {
-					output: validation.error!,
-					isError: true,
-					details: { files: [] },
-				};
+				throw new Error(validation.error!);
 			}
 
 			// Get the active tab
@@ -612,11 +604,7 @@ export class BrowserJavaScriptTool
 				currentWindow: true,
 			});
 			if (!tab || !tab.id) {
-				return {
-					output: "Error: No active tab found",
-					isError: true,
-					details: { files: [] },
-				};
+				throw new Error("No active tab found");
 			}
 
 			// Check if we can execute scripts on this tab
@@ -625,21 +613,21 @@ export class BrowserJavaScriptTool
 				tab.url?.startsWith("chrome-extension://") ||
 				tab.url?.startsWith("about:")
 			) {
-				return {
-					output: `Error: Cannot execute scripts on ${tab.url}. Extension pages and internal URLs are protected.`,
-					isError: true,
-					details: { files: [] },
-				};
+				throw new Error(`Cannot execute scripts on ${tab.url}. Extension pages and internal URLs are protected.`);
 			}
 
 			// Check if userScripts API is available
 			const apiCheck = await checkUserScriptsAvailability();
 			if (!apiCheck.available) {
-				return {
-					output: apiCheck.message!,
-					isError: !apiCheck.shouldRetry,
-					details: { files: [] },
-				};
+				if (apiCheck.shouldRetry) {
+					// This is a non-error case where the user granted permission - return success
+					return {
+						output: apiCheck.message!,
+						isError: false,
+						details: { files: [] },
+					};
+				}
+				throw new Error(apiCheck.message!);
 			}
 
 			// Load all skills for current domain and prepend libraries
@@ -755,17 +743,13 @@ export class BrowserJavaScriptTool
 					// Firefox doesn't have userScripts.execute() yet, and scripting.executeScript()
 					// cannot bypass page CSP to use eval. We have no workaround.
 					// See: https://bugzilla.mozilla.org/show_bug.cgi?id=1930776
-					return {
-						output: `Error: Firefox is currently not supported for the browser_javascript tool.
+					throw new Error(`Firefox is currently not supported for the browser_javascript tool.
 
 Firefox does not yet support the userScripts.execute() API, which is required to execute arbitrary JavaScript code while bypassing page Content Security Policy.
 
 Please use Chrome 138+ with the "Allow User Scripts" toggle enabled, or wait for Firefox to implement userScripts.execute().
 
-Track Firefox implementation: https://bugzilla.mozilla.org/show_bug.cgi?id=1930776`,
-						isError: true,
-						details: { files: [] },
-					};
+Track Firefox implementation: https://bugzilla.mozilla.org/show_bug.cgi?id=1930776`);
 				}
 
 				const result = results[0]?.result as
@@ -778,12 +762,7 @@ Track Firefox implementation: https://bugzilla.mozilla.org/show_bug.cgi?id=19307
 					| undefined;
 
 				if (!result) {
-					return {
-						output:
-							"Error: No result returned from script execution. Need to reload page.",
-						isError: true,
-						details: { files: [] },
-					};
+					throw new Error("No result returned from script execution. Need to reload page.");
 				}
 
 				// Get console logs from provider
@@ -806,11 +785,8 @@ Track Firefox implementation: https://bugzilla.mozilla.org/show_bug.cgi?id=19307
 					if (output) output += "\n";
 					output += `Error: ${result.error}\n${result.stack || "No stack trace available"}`;
 
-					return {
-						output: output.trim(),
-						isError: true,
-						details: { files: [] },
-					};
+					// Throw error with console logs included in message
+					throw new Error(output.trim());
 				}
 
 				// Add last expression value if present and not undefined
@@ -884,38 +860,16 @@ Track Firefox implementation: https://bugzilla.mozilla.org/show_bug.cgi?id=19307
 				};
 			} catch (error: unknown) {
 				const err = error as Error;
-				// Check if this was an abort
-				if (err.message === "Aborted" || signal?.aborted) {
-					return {
-						output: "Tool execution was aborted by user",
-						isError: true,
-						details: { files: [] },
-					};
-				}
-				return {
-					output: `Error executing script: ${err.message}`,
-					isError: true,
-					details: { files: [] },
-				};
+				// Re-throw - errors will be handled by outer catch
+				throw err;
 			} finally {
 				// Unregister sandbox from RUNTIME_MESSAGE_ROUTER
 				RUNTIME_MESSAGE_ROUTER.unregisterSandbox(sandboxId);
 			}
 		} catch (error: unknown) {
 			const err = error as Error;
-			// Check if this was an abort
-			if (err.message === "Aborted" || signal?.aborted) {
-				return {
-					output: "Tool execution was aborted by user",
-					isError: true,
-					details: { files: [] },
-				};
-			}
-			return {
-				output: `Error executing script: ${err.message}`,
-				isError: true,
-				details: { files: [] },
-			};
+			// All errors (including abort) are re-thrown so the agent framework marks the tool call as failed
+			throw err;
 		}
 	};
 }
