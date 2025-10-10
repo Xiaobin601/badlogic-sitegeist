@@ -440,6 +440,46 @@ async function initApp() {
 	const urlParams = new URLSearchParams(window.location.search);
 	let sessionIdFromUrl = urlParams.get("session");
 	const isNewSession = urlParams.get("new") === "true";
+	const testStepsParam = urlParams.get("teststeps");
+
+	// Handle test prompts - create temporary session without saving
+	if (testStepsParam) {
+		try {
+			const testSteps = JSON.parse(decodeURIComponent(testStepsParam)) as string[];
+			await createAgent();
+			renderApp();
+
+			// Wait for UI to render
+			await new Promise((resolve) => requestAnimationFrame(resolve));
+
+			// Submit prompts sequentially
+			for (let i = 0; i < testSteps.length; i++) {
+				const step = testSteps[i];
+				if (!chatPanel?.agentInterface) break;
+
+				// Send the prompt
+				await chatPanel.agentInterface.sendMessage(step);
+
+				// Wait for agent to finish (not streaming anymore)
+				if (i < testSteps.length - 1) {
+					// Wait for response to complete before sending next step
+					await new Promise<void>((resolve) => {
+						const checkComplete = () => {
+							if (!chatPanel.agent?.state.isStreaming) {
+								resolve();
+							} else {
+								setTimeout(checkComplete, 100);
+							}
+						};
+						checkComplete();
+					});
+				}
+			}
+			return;
+		} catch (err) {
+			console.error("Failed to run test steps:", err);
+		}
+	}
 
 	// If no session in URL and not explicitly creating new, try to load the most recent session
 	if (!sessionIdFromUrl && !isNewSession && storage.sessions) {
