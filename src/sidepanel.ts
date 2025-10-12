@@ -1,6 +1,7 @@
 import { Button, Input, icon } from "@mariozechner/mini-lit";
 import "@mariozechner/mini-lit/dist/ThemeToggle.js";
 import { type AgentTool, getModel } from "@mariozechner/pi-ai";
+import * as port from "./port.js";
 import {
 	Agent,
 	type AgentState,
@@ -180,33 +181,7 @@ let isEditingTitle = false;
 let agent: Agent;
 let chatPanel: ChatPanel;
 let agentUnsubscribe: (() => void) | undefined;
-let currentWindowId: number | undefined;
-let port: chrome.runtime.Port;
-
-// Reconnect port if disconnected (Chrome disconnects after ~5min inactivity)
-function ensurePortConnected(): chrome.runtime.Port {
-	try {
-		// Test if port is still connected by checking its name property
-		// Disconnected ports throw an error when accessed
-		if (port && port.name) {
-			return port;
-		}
-	} catch (e) {
-		// Port is disconnected, need to reconnect
-	}
-
-	// Reconnect
-	console.log("[Port] Reconnecting after disconnect...");
-	port = browserAPI.runtime.connect({ name: `sidepanel:${currentWindowId}` });
-	setupPortMessageHandler();
-	return port;
-}
-
-// Export port getter for other modules (e.g., SessionListDialog)
-// Always returns a valid, connected port
-export function getPort(): chrome.runtime.Port {
-	return ensurePortConnected();
-}
+let currentWindowId: number;
 
 // Debug function to dump session metadata
 (window as any).dumpSessionMetadata = async () => {
@@ -298,53 +273,6 @@ export function getPort(): chrome.runtime.Port {
 // ============================================================================
 // HELPERS
 // ============================================================================
-
-// Global message handler for port responses
-const portResponseHandlers = new Map<string, (msg: any) => void>();
-
-function setupPortMessageHandler() {
-	port.onMessage.addListener((msg) => {
-		// Handle close-yourself command
-		if (msg.type === "close-yourself") {
-			window.close();
-			return;
-		}
-
-		// Handle responses for sendPortMessage
-		if (msg.type === "lockResult" || msg.type === "lockedSessions") {
-			const handler = portResponseHandlers.get(msg.type);
-			if (handler) {
-				handler(msg);
-			}
-		}
-	});
-
-	// Handle disconnect events (Chrome disconnects ports after ~5min inactivity)
-	port.onDisconnect.addListener(() => {
-		console.log("[Port] Disconnected (likely due to inactivity). Will reconnect on next use.");
-	});
-}
-
-// Send message via port and wait for response
-// Always ensures port is connected before sending
-export function sendPortMessage<T = any>(
-	message: any,
-	responseType: string,
-): Promise<T> {
-	return new Promise((resolve, reject) => {
-		const currentPort = ensurePortConnected();
-		portResponseHandlers.set(responseType, (msg: any) => {
-			portResponseHandlers.delete(responseType);
-			resolve(msg);
-		});
-		try {
-			currentPort.postMessage(message);
-		} catch (err) {
-			portResponseHandlers.delete(responseType);
-			reject(err);
-		}
-	});
-}
 
 const generateTitle = (messages: AppMessage[]): string => {
 	const firstUserMsg = messages.find((m) => m.role === "user");
@@ -504,14 +432,14 @@ const createAgent = async (
 					updateUrl(currentSessionId);
 
 					// Acquire lock for newly created session
-					sendPortMessage(
+					port.sendMessage(
 						{
 							type: "acquireLock",
 							sessionId: currentSessionId,
 							windowId: currentWindowId,
 						},
 						"lockResult",
-					).then((lockResponse: { success: boolean }) => {
+					).then((lockResponse: any) => {
 						if (!lockResponse?.success) {
 							console.warn(
 								"Failed to acquire lock for newly created session",
@@ -875,13 +803,13 @@ async function initApp() {
 
 	// Get current window ID for filtering tab events
 	const currentWindow = await browserAPI.windows.getCurrent();
+	if (!currentWindow.id) {
+		throw new Error("Failed to get current window ID");
+	}
 	currentWindowId = currentWindow.id;
 
-	// Create port connection for lock management
-	port = browserAPI.runtime.connect({ name: `sidepanel:${currentWindowId}` });
-
-	// Set up message handler for port
-	setupPortMessageHandler();
+	// Initialize port communication system
+	port.initialize(currentWindowId);
 
 	// Request persistent storage
 	// if (storage.sessions) {
@@ -976,7 +904,7 @@ async function initApp() {
 		const latestSessionId = await storage.sessions.getLatestSessionId();
 		if (latestSessionId) {
 			// Try to acquire lock for latest session
-			const lockResponse = await sendPortMessage<{ success: boolean }>(
+			const lockResponse = await port.sendMessage<{ success: boolean }>(
 				{
 					type: "acquireLock",
 					sessionId: latestSessionId,
@@ -998,7 +926,7 @@ async function initApp() {
 		const sessionData = await storage.sessions.loadSession(sessionIdFromUrl);
 		if (sessionData) {
 			// Try to acquire lock if we don't already have it (in case user navigated directly via URL)
-			const lockResponse = await sendPortMessage<{ success: boolean }>(
+			const lockResponse = await port.sendMessage<{ success: boolean }>(
 				{
 					type: "acquireLock",
 					sessionId: sessionIdFromUrl,
