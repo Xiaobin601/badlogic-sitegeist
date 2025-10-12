@@ -220,9 +220,79 @@ export function getPort(): chrome.runtime.Port {
 			lastModified: m.lastModified,
 			createdAt: m.createdAt,
 			messageCount: m.messageCount,
+			totalCost: m.usage.cost.total,
 		})),
 	);
 	return metadata;
+};
+
+// One-time migration: recalculate usage for all sessions
+(window as any).migrateSessionUsage = async () => {
+	const metadata = await storage.sessions.getAllMetadata();
+	console.log(`Migrating ${metadata.length} sessions...`);
+
+	let migrated = 0;
+	for (const meta of metadata) {
+		try {
+			const session = await storage.sessions.get(meta.id);
+			if (!session) continue;
+
+			// Recalculate usage
+			const usage = {
+				input: 0,
+				output: 0,
+				cacheRead: 0,
+				cacheWrite: 0,
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+			};
+
+			for (const msg of session.messages) {
+				if (msg.role === "assistant" && "usage" in msg && msg.usage) {
+					usage.input += msg.usage.input || 0;
+					usage.output += msg.usage.output || 0;
+					usage.cacheRead += msg.usage.cacheRead || 0;
+					usage.cacheWrite += msg.usage.cacheWrite || 0;
+					if (msg.usage.cost) {
+						usage.cost.input += msg.usage.cost.input || 0;
+						usage.cost.output += msg.usage.cost.output || 0;
+						usage.cost.cacheRead += msg.usage.cost.cacheRead || 0;
+						usage.cost.cacheWrite += msg.usage.cost.cacheWrite || 0;
+						usage.cost.total += msg.usage.cost.total || 0;
+					}
+				}
+			}
+
+			// Generate preview
+			let preview = "";
+			for (const msg of session.messages) {
+				if (preview.length >= 2048) break;
+				if (msg.role === "user") {
+					const text =
+						typeof msg.content === "string"
+							? msg.content
+							: (msg.content.find((c: any) => c.type === "text") as any)?.text || "";
+					preview += text + "\n";
+				} else if (msg.role === "assistant" && "content" in msg) {
+					const text = (msg.content.find((c: any) => c.type === "text") as any)?.text || "";
+					preview += text + "\n";
+				}
+			}
+			preview = preview.substring(0, 2048);
+
+			const updatedMetadata = {
+				...meta,
+				usage,
+				preview,
+			};
+
+			await storage.sessions.saveSession(session.id, session, updatedMetadata, session.title);
+			migrated++;
+		} catch (err) {
+			console.error(`Failed to migrate session ${meta.id}:`, err);
+		}
+	}
+
+	console.log(`✅ Migrated ${migrated}/${metadata.length} sessions`);
 };
 
 // ============================================================================
@@ -306,10 +376,68 @@ const saveSession = async () => {
 	if (!shouldSaveSession(state.messages)) return;
 
 	try {
+		// Calculate cumulative usage from all assistant messages
+		const usage = {
+			input: 0,
+			output: 0,
+			cacheRead: 0,
+			cacheWrite: 0,
+			cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+		};
+
+		for (const msg of state.messages) {
+			if (msg.role === "assistant" && "usage" in msg && msg.usage) {
+				usage.input += msg.usage.input || 0;
+				usage.output += msg.usage.output || 0;
+				usage.cacheRead += msg.usage.cacheRead || 0;
+				usage.cacheWrite += msg.usage.cacheWrite || 0;
+				if (msg.usage.cost) {
+					usage.cost.input += msg.usage.cost.input || 0;
+					usage.cost.output += msg.usage.cost.output || 0;
+					usage.cost.cacheRead += msg.usage.cost.cacheRead || 0;
+					usage.cost.cacheWrite += msg.usage.cost.cacheWrite || 0;
+					usage.cost.total += msg.usage.cost.total || 0;
+				}
+			}
+		}
+
+		// Generate preview text (first 2KB of user + assistant text)
+		let preview = "";
+		for (const msg of state.messages) {
+			if (preview.length >= 2048) break;
+			if (msg.role === "user") {
+				const text =
+					typeof msg.content === "string"
+						? msg.content
+						: (msg.content.find((c: any) => c.type === "text") as any)?.text || "";
+				preview += text + "\n";
+			} else if (msg.role === "assistant" && "content" in msg) {
+				const text = (msg.content.find((c: any) => c.type === "text") as any)?.text || "";
+				preview += text + "\n";
+			}
+		}
+		preview = preview.substring(0, 2048);
+
+		// Preserve createdAt if session already exists
+		const existingMetadata = await storage.sessions.getMetadata(currentSessionId);
+		const createdAt = existingMetadata?.createdAt || new Date().toISOString();
+
+		const metadata = {
+			id: currentSessionId,
+			title: currentTitle,
+			createdAt,
+			lastModified: new Date().toISOString(),
+			messageCount: state.messages.length,
+			usage,
+			modelId: state.model.id,
+			thinkingLevel: state.thinkingLevel,
+			preview,
+		};
+
 		await storage.sessions.saveSession(
 			currentSessionId,
 			state,
-			undefined,
+			metadata,
 			currentTitle,
 		);
 	} catch (err) {

@@ -53,8 +53,17 @@ function captureOrbAsImage(size: number): Promise<Blob> {
 					throw new Error("Failed to get 2D context");
 				}
 
-				// Draw the orb canvas scaled down to target size
-				ctx.drawImage(canvas, 0, 0, size, size);
+				// Crop to center 60% of the orb canvas (the orb is small in the 400x400 space)
+				// Then scale up to fill the icon
+				const cropSize = canvas.width * 0.6; // Take center 60%
+				const cropOffset = (canvas.width - cropSize) / 2;
+
+				// Draw cropped and scaled orb
+				ctx.drawImage(
+					canvas,
+					cropOffset, cropOffset, cropSize, cropSize, // Source: center crop
+					0, 0, size, size // Destination: full icon size
+				);
 
 				// Convert to blob
 				outputCanvas.toBlob(
