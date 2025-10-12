@@ -1,5 +1,6 @@
 import { html, i18n, icon, type TemplateResult } from "@mariozechner/mini-lit";
 import "@mariozechner/mini-lit/dist/MarkdownBlock.js";
+import { createRef, ref } from "lit/directives/ref.js";
 import {
 	type AgentTool,
 	StringEnum,
@@ -7,6 +8,7 @@ import {
 } from "@mariozechner/pi-ai";
 import {
 	registerToolRenderer,
+	renderCollapsibleHeader,
 	renderHeader,
 	SandboxIframe,
 	type ToolRenderer,
@@ -474,14 +476,19 @@ export const skillRenderer: ToolRenderer<SkillParams, SkillResultDetails> = {
 				? `${labels[action!] || action} ${skillName}`
 				: labels[action!] || action || "";
 
-			// For create/update errors, show partial skill data with error at bottom
+			// For create/update errors, show partial skill data with error at bottom - COLLAPSED BY DEFAULT
 			if ((action === "create" || action === "update") && params?.data) {
+				const contentRef = createRef<HTMLElement>();
+				const chevronRef = createRef<HTMLElement>();
+
 				return {content: html`
-					<div class="space-y-3">
-						${renderHeader(state, Sparkles, headerText)}
-						${renderSkillFields(params.data, true)}
-						<div class="w-full px-3 py-2 text-sm text-destructive bg-destructive/10 border border-destructive rounded">
-							${result.output || ""}
+					<div>
+						${renderCollapsibleHeader(state, Sparkles, headerText, contentRef, chevronRef, false)}
+						<div ${ref(contentRef)} class="overflow-hidden transition-all duration-200 ease-in-out max-h-0 space-y-3">
+							${renderSkillFields(params.data, true)}
+							<div class="w-full px-3 py-2 text-sm text-destructive bg-destructive/10 border border-destructive rounded">
+								${result.output || ""}
+							</div>
 						</div>
 					</div>
 				`, isCustom: false };
@@ -557,7 +564,7 @@ export const skillRenderer: ToolRenderer<SkillParams, SkillResultDetails> = {
 
 				case "create":
 				case "update": {
-					// Show all skill fields (including library)
+					// Show all skill fields (including library) - COLLAPSED BY DEFAULT
 					// Skill data comes from result.details (full Skill object)
 					const skillData = skill || params.data || {};
 					const skillName = skillData.name;
@@ -574,10 +581,15 @@ export const skillRenderer: ToolRenderer<SkillParams, SkillResultDetails> = {
 								? i18n("Updated skill")
 								: i18n("Updating skill");
 
+					const contentRef = createRef<HTMLElement>();
+					const chevronRef = createRef<HTMLElement>();
+
 					return {content: html`
-						<div class="space-y-3">
-							${renderHeader(state, Sparkles, headerText)}
-							${renderSkillFields(skillData, true)}
+						<div>
+							${renderCollapsibleHeader(state, Sparkles, headerText, contentRef, chevronRef, false)}
+							<div ${ref(contentRef)} class="overflow-hidden transition-all duration-200 ease-in-out max-h-0">
+								${renderSkillFields(skillData, true)}
+							</div>
 						</div>
 					`, isCustom: false};
 				}
@@ -623,10 +635,15 @@ export const skillRenderer: ToolRenderer<SkillParams, SkillResultDetails> = {
 					};
 					const headerText = `${labels[action]} ${skillName}`;
 
+					const contentRef = createRef<HTMLElement>();
+					const chevronRef = createRef<HTMLElement>();
+
 					return {content: html`
-						<div class="space-y-3">
-							${renderHeader(state, Sparkles, headerText)}
-							${data ? renderSkillFields(data, true) : ""}
+						<div>
+							${renderCollapsibleHeader(state, Sparkles, headerText, contentRef, chevronRef, false)}
+							<div ${ref(contentRef)} class="overflow-hidden transition-all duration-200 ease-in-out max-h-0">
+								${data ? renderSkillFields(data, true) : ""}
+							</div>
 						</div>
 					`, isCustom: false};
 				}
