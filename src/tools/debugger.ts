@@ -36,30 +36,26 @@ export interface DebuggerResult {
 export class DebuggerTool implements AgentTool<typeof debuggerSchema, DebuggerResult> {
 	label = "Debugger";
 	name = "debugger";
-	description = `Execute Chrome DevTools Protocol (CDP) commands for advanced debugging and inspection.
+	description = `Execute code in the MAIN JavaScript world (not USER_SCRIPT) to access things browser_javascript cannot.
 
-POWERFUL inspection capabilities:
-- Runtime.evaluate: Execute JavaScript in page context, access variables/functions
-- DOM.getDocument: Get full DOM tree with all attributes
-- DOM.querySelector: Find elements by CSS selector
-- DOM.getOuterHTML: Get HTML of any node
-- Network.getAllCookies: Read all cookies
-- Network.getCookies: Get cookies for URLs
-- Storage.getStorageKeyForFrame: Access localStorage/sessionStorage
-- Console.enable + Runtime.consoleAPICalled: Capture console logs
-- Page.captureScreenshot: Take screenshots
-- Performance.getMetrics: Get performance metrics
+USE CASES (what browser_javascript CANNOT access):
+- Page's own JavaScript variables, functions, framework instances (React, Vue, Angular state)
+- window properties set by page scripts
+- Cookies via document.cookie
+- All other MAIN world page internals that USER_SCRIPT world cannot see
 
-Common patterns:
-1. Execute JS: { method: "Runtime.evaluate", params: { expression: "document.title", returnByValue: true } }
-2. Get DOM: { method: "DOM.getDocument", params: { depth: -1 } }
-3. Find element: { method: "DOM.querySelector", params: { nodeId: 1, selector: ".my-class" } }
-4. Get cookies: { method: "Network.getAllCookies" }
-5. Get storage: { method: "Runtime.evaluate", params: { expression: "JSON.stringify(localStorage)", returnByValue: true } }
+MOST COMMON USAGE - Runtime.evaluate in MAIN context:
+{ method: "Runtime.evaluate", params: { expression: "yourJavaScriptCode", returnByValue: true } }
 
-Returns raw CDP response with result or exceptionDetails.
+Examples:
+1. Get cookies: { method: "Runtime.evaluate", params: { expression: "document.cookie", returnByValue: true } }
+2. Access React state: { method: "Runtime.evaluate", params: { expression: "window.myApp.state", returnByValue: true } }
+3. Call page function: { method: "Runtime.evaluate", params: { expression: "window.myFunction()", returnByValue: true } }
+4. Get framework instance: { method: "Runtime.evaluate", params: { expression: "angular.element(document.body).scope()", returnByValue: true } }
 
-CRITICAL: This is a POWERFUL debugging tool. Use it to inspect page internals when normal browser_javascript isn't enough.`;
+Returns raw CDP response. Use returnByValue: true to get actual values instead of object references.
+
+CRITICAL: This runs in MAIN world, not USER_SCRIPT. Use browser_javascript for DOM manipulation - use this ONLY for accessing MAIN world internals.`;
 	parameters = debuggerSchema;
 
 	constructor(private agent: Agent) {}
