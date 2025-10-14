@@ -99,6 +99,7 @@ MIT
 **Additional documentation** (read only when working on related features):
 - docs/tool-renderers.md - Tool renderer system for customizing how tool invocations appear in the chat UI
 - docs/storage.md - Storage architecture with IndexedDB backend, stores for sessions, settings, provider keys, and skills
+- docs/settings.md - Settings storage for user preferences and application configuration (theme, proxy, last used model, etc.)
 - docs/prompts.md - Centralized prompts and tool descriptions for the agent (system prompt, tool descriptions, guidelines)
 - docs/multi-window.md - Multi-window session management with port-based locking, automatic cleanup, and keyboard shortcuts
 - docs/i18n.md - Internationalization system for adding translations (English and German)

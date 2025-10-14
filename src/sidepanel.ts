@@ -204,10 +204,26 @@ const createAgent = async (
 
 	const transport = new ProviderTransport();
 
+	// Determine default model (last used model or fallback to Sonnet)
+	let defaultModel = getModel("anthropic", "claude-sonnet-4-5-20250929");
+	if (!initialState?.model) {
+		const savedProvider = await storage.settings.get<string>("lastUsedModel.provider");
+		const savedModelId = await storage.settings.get<string>("lastUsedModel.modelId");
+
+		if (savedProvider && savedModelId) {
+			try {
+				// biome-ignore lint/suspicious/noExplicitAny: providers are typed as string literal union
+				defaultModel = getModel(savedProvider as any, savedModelId);
+			} catch (error) {
+				console.warn("Failed to restore saved model, using default:", error);
+			}
+		}
+	}
+
 	agent = new Agent({
 		initialState: initialState || {
 			systemPrompt: SYSTEM_PROMPT,
-			model: getModel("anthropic", "claude-sonnet-4-5-20250929"),
+			model: defaultModel,
 			thinkingLevel: "off",
 			messages: [],
 			tools: [],
@@ -220,6 +236,16 @@ const createAgent = async (
 		agentUnsubscribe = agent.subscribe((event: AgentEvent) => {
 			if (event.type === "state-update") {
 				const messages = event.state.messages;
+
+				// Save last used model when it changes
+				if (event.state.model) {
+					storage.settings.set("lastUsedModel.provider", event.state.model.provider).catch(err =>
+						console.error("Failed to save lastUsedModel.provider:", err)
+					);
+					storage.settings.set("lastUsedModel.modelId", event.state.model.id).catch(err =>
+						console.error("Failed to save lastUsedModel.modelId:", err)
+					);
+				}
 
 				// Generate title after first successful response
 				if (!currentTitle && shouldSaveSession(messages)) {
