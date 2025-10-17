@@ -2,7 +2,9 @@
 
 ## Overview
 
-This document describes the architecture of prompts, tool descriptions, and runtime provider descriptions across the Sitegeist and web-ui codebases. Understanding this architecture is essential for maintaining and updating prompts consistently.
+This document describes the current architecture of prompts, tool descriptions, and runtime provider descriptions. Use this as a reference for understanding how prompts work and as a guide for adding new tools or modifying existing ones.
+
+**Current State**: All runtime providers and tool descriptions have been optimized following consistent patterns. Total agent setup uses ~7,555 tokens (42% reduction from original ~13,034 tokens).
 
 ## Core Concepts
 
@@ -65,66 +67,41 @@ The descriptions from runtime providers are **dynamically injected** so the LLM 
 └────────────────┘              └──────────────────┘
 ```
 
-## File Locations
+## Current Prompts
 
 ### Web-UI Prompts
 **File**: `/Users/badlogic/workspaces/pi-mono/packages/web-ui/src/prompts/prompts.ts`
 
-Contains shared prompts and runtime provider descriptions:
+Shared prompts and runtime provider descriptions:
 
-1. **JAVASCRIPT_REPL_TOOL_DESCRIPTION(runtimeProviderDescriptions)** (line 10)
-   - Template function for JavaScript REPL tool
-   - Accepts runtime provider descriptions array
-   - Documents sandboxed execution environment
+**Tool Descriptions** (template functions accepting `runtimeProviderDescriptions: string[]`):
+- `JAVASCRIPT_REPL_TOOL_DESCRIPTION` - Generic JavaScript REPL tool
+- `ARTIFACTS_TOOL_DESCRIPTION` - Artifacts management (create/update/rewrite/get/delete/htmlArtifactLogs)
 
-2. **ARTIFACTS_TOOL_DESCRIPTION(runtimeProviderDescriptions)** (line 69)
-   - Template function for artifacts tool
-   - Accepts runtime provider descriptions array
-   - Documents create/update/rewrite/get/delete/logs commands
-
-3. **ARTIFACTS_RUNTIME_PROVIDER_DESCRIPTION** (line 163)
-   - Provider description for artifact manipulation functions
-   - Exported to be used in tool descriptions
-   - Documents: `listArtifacts()`, `getArtifact()`, `createOrUpdateArtifact()`, `deleteArtifact()`
-
-4. **ATTACHMENTS_RUNTIME_DESCRIPTION** (line 209)
-   - Provider description for user attachment access
-   - Documents: `listAttachments()`, `readTextAttachment()`, `readBinaryAttachment()`
-
-5. **EXTRACT_DOCUMENT_DESCRIPTION** (line 240)
-   - Tool description for document extraction
-   - Simple description (not a template - no runtime providers)
+**Runtime Provider Descriptions**:
+- `ARTIFACTS_RUNTIME_PROVIDER_DESCRIPTION_RW` - Read-write artifact functions: `listArtifacts()`, `getArtifact()`, `createOrUpdateArtifact()`, `deleteArtifact()`
+- `ARTIFACTS_RUNTIME_PROVIDER_DESCRIPTION_RO` - Read-only artifact access (for HTML artifacts)
+- `ATTACHMENTS_RUNTIME_DESCRIPTION` - User attachment access: `listAttachments()`, `readTextAttachment()`, `readBinaryAttachment()`
+- `EXTRACT_DOCUMENT_DESCRIPTION` - Extract text from PDF/DOCX/XLSX/PPTX
 
 ### Sitegeist Prompts
 **File**: `/Users/badlogic/workspaces/sitegeist/src/prompts/prompts.ts`
 
-Contains Sitegeist-specific prompts:
+Sitegeist-specific prompts:
 
-1. **SYSTEM_PROMPT** (line 12)
-   - Main agent system prompt
-   - Defines identity, tone, tools, workflows
-   - Used during agent initialization in sidepanel.ts
+**System Prompt**:
+- `SYSTEM_PROMPT` - Main agent identity, tone, workflows
 
-2. **NATIVE_INPUT_EVENTS_DESCRIPTION** (line 180)
-   - Runtime provider description for trusted browser events
-   - Documents: `nativeClick()`, `nativeType()`, `nativePress()`, `nativeKeyDown()`, `nativeKeyUp()`
-   - Embedded directly into BROWSER_JAVASCRIPT_DESCRIPTION
+**Tool Descriptions**:
+- `REPL_TOOL_DESCRIPTION(runtimeProviderDescriptions)` - Browser REPL with browserjs()/navigate()
+- `SKILL_TOOL_DESCRIPTION` - Skill management (get/list/create/update/rewrite/delete)
+- `NAVIGATE_TOOL_DESCRIPTION` - Navigate to URLs in tabs
+- `ASK_USER_WHICH_ELEMENT_DESCRIPTION` - Element picker
 
-3. **NAVIGATE_TOOL_DESCRIPTION** (line 224)
-   - Tool description for navigate tool
-   - Simple description (no runtime providers)
-
-4. **JAVASCRIPT_REPL_DESCRIPTION** (line 246)
-   - Documentation for browser_repl tool with browserjs()/navigate() helpers
-   - ⚠️ **ISSUE**: Manually composed, should use template from web-ui
-
-5. **ASK_USER_WHICH_ELEMENT_DESCRIPTION** (line 325)
-   - Tool description for element selector
-   - Simple description (no runtime providers)
-
-6. **SKILL_TOOL_DESCRIPTION** (line 363)
-   - Tool description for skill management
-   - Simple description (no runtime providers)
+**Runtime Provider Descriptions**:
+- `BROWSERJS_RUNTIME_DESCRIPTION` - `browserjs()` for page context execution
+- `NAVIGATE_RUNTIME_DESCRIPTION` - `navigate()` helper function
+- `NATIVE_INPUT_EVENTS_DESCRIPTION` - Trusted events: `nativeClick()`, `nativeType()`, `nativePress()`, `nativeKeyDown()`, `nativeKeyUp()`
 
 ## Implementation Details
 
@@ -238,7 +215,7 @@ This composition ensures:
 
 ## Runtime Provider Descriptions Pattern
 
-All provider descriptions must follow this pattern:
+All provider descriptions must follow this optimized pattern:
 
 ```markdown
 ### Provider Name
@@ -249,20 +226,15 @@ Brief one-sentence summary of what these functions provide.
 - Bullet point describing use case
 - Another use case
 
-#### Do NOT Use For
-- Negative case
-- Another negative case
+#### Do NOT Use For (optional - only include if critical)
+- Negative case that would cause serious issues
 
 #### Functions
 - functionName(params) - Brief description, returns type
-  * Usage notes
-  * Example: const result = functionName(arg);
-
 - anotherFunction(params) - Brief description, returns type
-  * Example: await anotherFunction(arg);
 
 #### Example
-Complete workflow example:
+Complete workflow example showing typical usage:
 \`\`\`javascript
 const data = await someFunction();
 await anotherFunction(data);
@@ -272,51 +244,39 @@ await anotherFunction(data);
 **Key requirements**:
 - Start with `###` heading for provider name
 - Add one-sentence summary immediately after heading
-- Use `####` subheadings for: "When to Use", "Do NOT Use For", "Functions", "Example"
-- List functions with parameter and return type info
-- Provide inline examples for each function
-- End with complete workflow example in code block
-- Keep descriptions minimal (token efficiency)
+- Use `####` subheadings for: "When to Use", "Functions", "Example"
+- List functions with parameter and return type info ONLY (no inline examples - save tokens)
+- End with complete workflow example in code block showing real usage
+- Keep "Do NOT Use For" section minimal or omit if not critical
+- Keep descriptions minimal (token efficiency is critical)
 
 ## Tool Description Pattern
 
-All tool descriptions must follow this pattern:
+All tool descriptions must follow this optimized pattern:
 
 ```markdown
 # Tool Name
 
-## Purpose
-One-line summary of what the tool does.
+Brief one-sentence summary of what the tool does.
 
 ## When to Use
-- Use case 1
+- Use case 1 (prioritize most common use case first)
 - Use case 2
 - Use case 3
 
-## Environment
+## Environment (for execution tools like REPL)
 - What execution context
 - What APIs are available
 - What libraries can be imported
 
 ## Input
-- How to provide input
-- What data is available
+Show concrete examples of how to call the tool:
+- { action: "create", filename: "notes.md", content: "..." } - Brief description
+- { action: "update", filename: "notes.md", old_str: "...", new_str: "..." } - Brief description
+- { action: "get", filename: "data.json" } - Brief description
 
-## Output
-- How to return data
-- What formats are supported
-- What happens to the output
-
-## Example
-\`\`\`javascript
-// Concrete example
-const result = doSomething();
-console.log(result);
-\`\`\`
-
-## Important Notes
-- Critical constraint 1
-- Critical constraint 2
+## Returns
+What the tool returns (success status, content, errors, etc.)
 
 ## Helper Functions (Automatically Available)
 
@@ -327,93 +287,81 @@ ${runtimeProviderDescriptions.join("\n\n")}
 
 **Key requirements**:
 - Use `#` for main heading, `##` for sections
-- Start with Purpose (one line)
-- Include "When to Use", "Environment", "Input", "Output"
-- Provide concrete examples
-- End with "Helper Functions (Automatically Available)" section for runtime provider injection
-- Keep minimal (token efficiency)
+- Start with brief one-sentence summary (NOT a separate ## Purpose section)
+- Include "When to Use" section with prioritized use cases
+- **## Input section shows CONCRETE EXAMPLES** of parameters, not abstract descriptions
+- Include "## Returns" section describing output
+- Remove verbose "## Output" and "## Important Notes" sections - integrate into other sections
+- End with "Helper Functions (Automatically Available)" for runtime provider injection (if applicable)
+- Keep minimal (token efficiency is critical)
 
-## Current Issues & Migration Path
+**Action Naming Conventions**:
+For tools that manipulate content (artifacts, skills), use consistent action names:
+- **update**: String replacement for targeted edits (`old_string` → `new_string`) - PREFERRED for token efficiency
+- **rewrite**: Full replacement of entire fields - LAST RESORT when update won't work
+- **create**: Create new items
+- **get**: Retrieve items
+- **delete**: Delete items
+- **list**: List available items
 
-### Issues
 
-1. **JAVASCRIPT_REPL_DESCRIPTION is manually composed**
-   - Sitegeist has its own version instead of using web-ui template
-   - Should use `JAVASCRIPT_REPL_TOOL_DESCRIPTION` from web-ui
-   - Need to ensure runtime provider descriptions are properly injected
+## Guidelines for Adding/Modifying Prompts
 
-2. **Inconsistent provider description styles**
-   - Some providers return minimal descriptions (e.g., BrowserJsRuntimeProvider: "Provides browserjs() helper")
-   - Others follow the full pattern (e.g., ARTIFACTS_RUNTIME_PROVIDER_DESCRIPTION)
-   - Need to standardize all to follow the full pattern
+### When Adding a New Tool
 
-3. **browserjs() and navigate() lack provider descriptions**
-   - `BrowserJsRuntimeProvider.getDescription()` returns stub
-   - `NavigateRuntimeProvider.getDescription()` returns stub
-   - Should follow full provider description pattern with examples
+1. **Choose the right location**:
+   - Shared/reusable tools → `/Users/badlogic/workspaces/pi-mono/packages/web-ui/src/prompts/prompts.ts`
+   - Sitegeist-specific tools → `/Users/badlogic/workspaces/sitegeist/src/prompts/prompts.ts`
 
-### Migration Tasks
+2. **Follow the tool description pattern** (see above)
 
-#### High Priority
+3. **If the tool uses runtime providers**:
+   - Make description a template function: `(runtimeProviderDescriptions: string[]) => string`
+   - End with "## Helper Functions (Automatically Available)" section
+   - Inject providers: `${runtimeProviderDescriptions.join("\n\n")}`
 
-1. **Standardize BrowserJsRuntimeProvider description**
-   - Create full description following the pattern
-   - Document `browserjs(func, ...args)` with examples
-   - Add WHEN TO USE and DO NOT USE sections
+4. **Implement the tool**:
+   - If using providers, make `description` a getter that calls `runtimeProvidersFactory()`
+   - See Implementation Details section for examples
 
-2. **Standardize NavigateRuntimeProvider description**
-   - Create full description following the pattern
-   - Document `navigate(args)` with examples
-   - Add WHEN TO USE and DO NOT USE sections
+### When Adding a Runtime Provider
 
-#### Medium Priority
+1. **Implement the provider class**:
+   - Implement `SandboxRuntimeProvider` interface
+   - Define `getData()`, `getRuntime()`, optional `handleMessage()`
+   - Define `getDescription()` returning your provider description
 
-3. **Use web-ui JAVASCRIPT_REPL_TOOL_DESCRIPTION in sitegeist**
-   - Remove custom JAVASCRIPT_REPL_DESCRIPTION from sitegeist prompts.ts
-   - Import and use JAVASCRIPT_REPL_TOOL_DESCRIPTION from web-ui
-   - Ensure runtime providers are properly passed
+2. **Write the provider description** following the pattern above
 
-4. **Audit all provider descriptions for consistency**
-   - NativeInputEventsRuntimeProvider - already follows pattern ✓
-   - ARTIFACTS_RUNTIME_PROVIDER_DESCRIPTION - follows pattern ✓
-   - ATTACHMENTS_RUNTIME_DESCRIPTION - follows pattern ✓
-   - BrowserJsRuntimeProvider - needs work
-   - NavigateRuntimeProvider - needs work
+3. **Register the provider** in tool's `runtimeProvidersFactory`
 
-5. **Document skill library injection**
-   - Skills auto-inject into browserjs() execution context
-   - Need to document how this works in system prompt
-   - Consider adding to BrowserJsRuntimeProvider description
+### When Modifying Existing Prompts
 
-## Writing Guidelines
+1. **Follow existing patterns** - use same header structure, action names, formatting
+2. **Keep token efficiency in mind**:
+   - Remove redundant examples (one complete workflow example is better than many inline examples)
+   - Use concrete examples in ## Input rather than abstract descriptions
+   - Minimize "Do NOT Use For" sections - only include critical negative cases
+3. **Use consistent action naming**:
+   - `update` for string replacement (preferred)
+   - `rewrite` for full replacement (last resort)
+   - `create`, `get`, `delete`, `list` where applicable
 
-### Structure
-- Start with one-line summary
-- Use clear headers (`##`, `###`)
-- Group related information
-- Put critical rules at the end with CRITICAL/IMPORTANT prefix
-- Include concrete examples
+### Writing Style
 
-### Language
-- Be explicit: "ALWAYS use X", "NEVER use Y"
-- Use active voice: "Click the button" not "The button should be clicked"
-- Give concrete examples with code
-- State consequences: "If you do X, Y will happen"
-- Avoid "you should" or "it's recommended" - be direct
+- **Be explicit**: "ALWAYS use X", "NEVER use Y"
+- **Use active voice**: "Click the button" not "The button should be clicked"
+- **Give concrete examples with code**
+- **State consequences**: "If you do X, Y will happen"
+- **Avoid "you should" or "it's recommended"** - be direct
 
-### Examples
-Always provide:
-- Inline examples for each function
-- Complete workflow examples at the end
-- Both positive and negative examples where helpful
+### Testing Changes
 
-### Testing
 After updating prompts:
-1. Edit the prompt file
-2. Run `./check.sh` to verify no TypeScript errors
-3. Test with actual agent - does it follow instructions?
-4. Check edge cases - does it handle errors correctly?
-5. Verify terminology is consistent across all prompts
+1. Run `./check.sh` to verify no TypeScript errors
+2. Test with actual agent - does it follow instructions?
+3. Check edge cases - does it handle errors correctly?
+4. Verify terminology is consistent across all prompts
 
 ## References
 
