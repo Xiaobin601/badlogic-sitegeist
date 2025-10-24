@@ -121,6 +121,11 @@ export class CostsTab extends SettingsTab {
 		const storage = getSitegeistStorage();
 
 		try {
+			// Get CSS variable colors for theming
+			const styles = getComputedStyle(document.documentElement);
+			const textColor = styles.getPropertyValue("--color-foreground").trim();
+			const gridColor = styles.getPropertyValue("--color-border").trim();
+
 			// Get daily costs based on selected date range
 			const now = new Date();
 			const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -197,17 +202,30 @@ export class CostsTab extends SettingsTab {
 							legend: {
 								display: true,
 								position: "bottom",
+								labels: {
+									color: textColor,
+								},
 							},
 						},
 						scales: {
 							x: {
 								stacked: true,
+								ticks: {
+									color: textColor,
+								},
+								grid: {
+									color: gridColor,
+								},
 							},
 							y: {
 								stacked: true,
 								beginAtZero: true,
 								ticks: {
+									color: textColor,
 									callback: (value) => `$${value}`,
+								},
+								grid: {
+									color: gridColor,
 								},
 							},
 						},
@@ -234,6 +252,7 @@ export class CostsTab extends SettingsTab {
 									"rgb(168, 85, 247)", // purple
 									"rgb(14, 165, 233)", // sky
 								],
+								borderWidth: 0,
 							},
 						],
 					},
@@ -243,6 +262,9 @@ export class CostsTab extends SettingsTab {
 						plugins: {
 							legend: {
 								position: "bottom",
+								labels: {
+									color: textColor,
+								},
 							},
 						},
 					},
