@@ -35,7 +35,7 @@ export function createOverlayScript(taskName: string): string {
 		overflow: hidden;
 	\`;
 
-	// Layer 1: Horizontal sweep (indigo)
+	// Layer 1: Horizontal sweep (orange)
 	const layer1 = document.createElement('div');
 	layer1.style.cssText = \`
 		position: absolute;
@@ -46,16 +46,16 @@ export function createOverlayScript(taskName: string): string {
 		background: linear-gradient(
 			90deg,
 			transparent 0%,
-			rgba(99, 102, 241, 0.15) 25%,
-			rgba(99, 102, 241, 0.4) 50%,
-			rgba(99, 102, 241, 0.15) 75%,
+			rgba(217, 79, 0, 0.15) 25%,
+			rgba(255, 107, 0, 0.4) 50%,
+			rgba(217, 79, 0, 0.15) 75%,
 			transparent 100%
 		);
 		background-size: 200% 100%;
 		animation: sitegeist-shimmer-horizontal 3s ease-in-out infinite;
 	\`;
 
-	// Layer 2: Diagonal sweep (purple)
+	// Layer 2: Diagonal sweep (purple/pink)
 	const layer2 = document.createElement('div');
 	layer2.style.cssText = \`
 		position: absolute;
@@ -66,16 +66,16 @@ export function createOverlayScript(taskName: string): string {
 		background: linear-gradient(
 			135deg,
 			transparent 0%,
-			rgba(147, 51, 234, 0.1) 25%,
-			rgba(147, 51, 234, 0.3) 50%,
-			rgba(147, 51, 234, 0.1) 75%,
+			rgba(123, 31, 162, 0.1) 25%,
+			rgba(194, 24, 91, 0.3) 50%,
+			rgba(81, 45, 168, 0.1) 75%,
 			transparent 100%
 		);
 		background-size: 200% 200%;
 		animation: sitegeist-shimmer-diagonal 4s ease-in-out infinite;
 	\`;
 
-	// Layer 3: Vertical sweep (blue)
+	// Layer 3: Vertical sweep (blue/green)
 	const layer3 = document.createElement('div');
 	layer3.style.cssText = \`
 		position: absolute;
@@ -86,16 +86,16 @@ export function createOverlayScript(taskName: string): string {
 		background: linear-gradient(
 			180deg,
 			transparent 0%,
-			rgba(59, 130, 246, 0.1) 25%,
-			rgba(59, 130, 246, 0.25) 50%,
-			rgba(59, 130, 246, 0.1) 75%,
+			rgba(21, 101, 192, 0.1) 25%,
+			rgba(45, 139, 61, 0.25) 50%,
+			rgba(21, 101, 192, 0.1) 75%,
 			transparent 100%
 		);
 		background-size: 100% 200%;
 		animation: sitegeist-shimmer-vertical 5s ease-in-out infinite;
 	\`;
 
-	// Layer 4: Pulsing border glow
+	// Layer 4: Pulsing border glow (gold/orange)
 	const borderGlow = document.createElement('div');
 	borderGlow.style.cssText = \`
 		position: absolute;
@@ -103,8 +103,8 @@ export function createOverlayScript(taskName: string): string {
 		left: 0;
 		width: 100%;
 		height: 100%;
-		box-shadow: inset 0 0 80px rgba(99, 102, 241, 0.3),
-		            inset 0 0 40px rgba(147, 51, 234, 0.2);
+		box-shadow: inset 0 0 80px rgba(212, 165, 0, 0.3),
+		            inset 0 0 40px rgba(216, 67, 21, 0.2);
 		animation: sitegeist-pulse 2s ease-in-out infinite;
 	\`;
 
@@ -112,6 +112,58 @@ export function createOverlayScript(taskName: string): string {
 	shimmerContainer.appendChild(layer2);
 	shimmerContainer.appendChild(layer3);
 	shimmerContainer.appendChild(borderGlow);
+
+	// Create particle system
+	const particleContainer = document.createElement('div');
+	particleContainer.style.cssText = \`
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+		overflow: hidden;
+		pointer-events: none;
+	\`;
+
+	// Generate 30 particles with random properties
+	for (let i = 0; i < 30; i++) {
+		const particle = document.createElement('div');
+		const size = Math.random() * 4 + 2; // 2-6px
+		const startX = Math.random() * 100; // Random horizontal position
+		const startY = Math.random() * 100; // Random vertical position
+		const duration = Math.random() * 10 + 8; // 8-18s
+		const delay = Math.random() * 5; // 0-5s delay
+		const opacity = Math.random() * 0.4 + 0.3; // 0.3-0.7
+
+		// Random color from OrbAnimation palette
+		const colors = [
+			'217, 79, 0',     // orange
+			'255, 107, 0',    // bright orange
+			'212, 165, 0',    // gold
+			'45, 139, 61',    // green
+			'21, 101, 192',   // blue
+			'123, 31, 162',   // purple
+			'194, 24, 91',    // pink
+			'216, 67, 21',    // red-orange
+			'81, 45, 168',    // deep purple
+		];
+		const color = colors[Math.floor(Math.random() * colors.length)];
+
+		particle.style.cssText = \`
+			position: absolute;
+			left: \${startX}%;
+			top: \${startY}%;
+			width: \${size}px;
+			height: \${size}px;
+			background: rgba(\${color}, \${opacity});
+			border-radius: 50%;
+			box-shadow: 0 0 \${size * 2}px rgba(\${color}, \${opacity * 0.8});
+			animation: sitegeist-particle-float \${duration}s ease-in-out \${delay}s infinite;
+		\`;
+		particleContainer.appendChild(particle);
+	}
+
+	shimmerContainer.appendChild(particleContainer);
 
 	// Create toolbar
 	const toolbar = document.createElement('div');
@@ -211,12 +263,31 @@ export function createOverlayScript(taskName: string): string {
 
 		@keyframes sitegeist-pulse {
 			0%, 100% {
-				box-shadow: inset 0 0 80px rgba(99, 102, 241, 0.3),
-				            inset 0 0 40px rgba(147, 51, 234, 0.2);
+				box-shadow: inset 0 0 80px rgba(212, 165, 0, 0.3),
+				            inset 0 0 40px rgba(216, 67, 21, 0.2);
 			}
 			50% {
-				box-shadow: inset 0 0 120px rgba(99, 102, 241, 0.5),
-				            inset 0 0 60px rgba(147, 51, 234, 0.3);
+				box-shadow: inset 0 0 120px rgba(212, 165, 0, 0.5),
+				            inset 0 0 60px rgba(216, 67, 21, 0.3);
+			}
+		}
+
+		@keyframes sitegeist-particle-float {
+			0%, 100% {
+				transform: translate(0, 0) scale(1);
+				opacity: 1;
+			}
+			25% {
+				transform: translate(20px, -30px) scale(1.2);
+				opacity: 0.8;
+			}
+			50% {
+				transform: translate(-10px, -60px) scale(0.9);
+				opacity: 0.6;
+			}
+			75% {
+				transform: translate(30px, -40px) scale(1.1);
+				opacity: 0.9;
 			}
 		}
 	\`;
