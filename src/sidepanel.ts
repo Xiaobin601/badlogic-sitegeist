@@ -48,6 +48,23 @@ import { tutorials } from "./tutorials.js";
 // Register custom message renderers
 registerNavigationRenderer();
 
+// Listen for abort messages from REPL overlay
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+	console.log("[Sidepanel] Received message:", message, "from:", sender);
+	if (message.type === "abort-repl") {
+		console.log("[Sidepanel] Abort-repl message received, agent streaming:", agent?.state.isStreaming);
+		if (agent?.state.isStreaming) {
+			console.log("[Sidepanel] Aborting agent...");
+			agent.abort();
+			sendResponse({ success: true });
+		} else {
+			console.log("[Sidepanel] Agent not streaming, ignoring");
+			sendResponse({ success: false, reason: "not-streaming" });
+		}
+		return true; // Keep channel open for async response
+	}
+});
+
 // ============================================================================
 // STORAGE SETUP
 // ============================================================================

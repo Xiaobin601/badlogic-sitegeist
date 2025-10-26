@@ -17,6 +17,7 @@ import { createRef, ref } from "lit/directives/ref.js";
 import { Code } from "lucide";
 import { REPL_TOOL_DESCRIPTION } from "../../prompts/prompts.js";
 import "../../utils/i18n-extension.js";
+import { injectOverlayForActiveTab, removeOverlayForActiveTab } from "./overlay-inject.js";
 
 // Execute JavaScript code with attachments using SandboxedIframe
 export async function executeJavaScript(
@@ -24,6 +25,7 @@ export async function executeJavaScript(
 	runtimeProviders: SandboxRuntimeProvider[],
 	signal?: AbortSignal,
 	sandboxUrlProvider?: () => string,
+	taskName?: string,
 ): Promise<{ output: string; files?: SandboxFile[] }> {
 	if (!code) {
 		throw new Error("Code parameter is required");
@@ -32,6 +34,18 @@ export async function executeJavaScript(
 	// Check for abort before starting
 	if (signal?.aborted) {
 		throw new Error("Execution aborted");
+	}
+
+	// Only inject overlay if code uses browserjs() (interacts with active tab)
+	const usesBrowserjs = code.includes("browserjs(");
+	let overlayTabId: number | undefined;
+	if (usesBrowserjs) {
+		try {
+			overlayTabId = await injectOverlayForActiveTab(taskName || "Executing JavaScript");
+		} catch (error) {
+			console.warn("[REPL] Failed to inject overlay:", error);
+			// Continue execution even if overlay fails
+		}
 	}
 
 	// Create a SandboxedIframe instance for execution
@@ -90,6 +104,11 @@ export async function executeJavaScript(
 			}
 		}
 
+		// Remove overlay on success (if it was injected)
+		if (usesBrowserjs) {
+			await removeOverlayForActiveTab();
+		}
+
 		return {
 			output: output.trim() || "Code executed successfully (no output)",
 			files: result.files,
@@ -97,6 +116,9 @@ export async function executeJavaScript(
 	} catch (error: unknown) {
 		// Clean up on error
 		sandbox.remove();
+		if (usesBrowserjs) {
+			await removeOverlayForActiveTab();
+		}
 		throw new Error((error as Error).message || "Execution failed");
 	}
 }
@@ -160,6 +182,7 @@ export function createReplTool(): AgentTool<typeof replSchema, ReplToolResult> &
 				this.runtimeProvidersFactory?.() ?? [],
 				signal,
 				this.sandboxUrlProvider,
+				args.title,
 			);
 			// Convert files to JSON-serializable with base64 payloads
 			const files = (result.files || []).map((f) => {

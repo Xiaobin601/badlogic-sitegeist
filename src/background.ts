@@ -8,6 +8,24 @@ chrome.action.onClicked.addListener((tab: chrome.tabs.Tab) => {
 	}
 });
 
+// Listen for messages from userScripts (overlay in page)
+console.log("[Background] onUserScriptMessage available:", !!chrome.runtime.onUserScriptMessage);
+if (chrome.runtime.onUserScriptMessage) {
+	chrome.runtime.onUserScriptMessage.addListener((message, sender, sendResponse) => {
+		console.log("[Background] Received userScript message:", message, "from:", sender);
+		if (message.type === "abort-repl") {
+			// Forward to all open sidepanels (they'll check if they're streaming)
+			console.log("[Background] Relaying abort-repl to sidepanels");
+			chrome.runtime.sendMessage(message);
+			sendResponse({ success: true });
+			return true;
+		}
+	});
+	console.log("[Background] onUserScriptMessage listener registered");
+} else {
+	console.error("[Background] onUserScriptMessage NOT available!");
+}
+
 // Storage keys for tracking state (persists across service worker sleep)
 const SIDEPANEL_OPEN_KEY = "sidepanel_open_windows";
 const SESSION_LOCKS_KEY = "session_locks"; // sessionId -> windowId mapping
